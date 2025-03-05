@@ -1,131 +1,156 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 
-const essayText = `
-The Importance of Renewable Energy Sources
-
-In recent years, the conversation surrounding energy production has shifted significantly. Renewable energy sources, such as solar, wind, and hydroelectric power, have gained prominence as viable alternatives to fossil fuels. This shift is crucial for several reasons.
-
-Firstly, renewable energy is sustainable. Unlike fossil fuels, which are finite and will eventually deplete, renewable sources are abundant and can be replenished naturally. For instance, solar energy harnesses the sun's rays, which will continue to shine for billions of years. This sustainability ensures that future generations will have access to energy.
-
-Secondly, the use of renewable energy significantly reduces greenhouse gas emissions. Traditional energy sources, like coal and oil, release large amounts of carbon dioxide and other harmful pollutants into the atmosphere. In contrast, renewable energy systems produce little to no emissions during operation. Transitioning to these cleaner energy sources is essential in combating climate change and protecting the environment.
-
-Moreover, investing in renewable energy can lead to economic growth and job creation. The renewable energy sector has been one of the fastest-growing industries in recent years. Jobs in solar panel installation, wind turbine maintenance, and other related fields are on the rise. This growth not only helps to reduce unemployment but also stimulates local economies.
-
-In conclusion, the transition to renewable energy sources is not just a trend; it is a necessity. By embracing these sustainable options, we can ensure a cleaner environment, a stable energy future, and economic prosperity. The time to act is now, and the benefits of renewable energy are clear.
-`;
-
 const App = () => {
-  const [notes, setNotes] = useState([]);
+  const [notes, setNotes] = useState('');
   const [popupVisible, setPopupVisible] = useState(false);
+  const [notePopupVisible, setNotePopupVisible] = useState(false);
+  const [deletePopupVisible, setDeletePopupVisible] = useState(false);
+  const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0 });
+  const [notePopupPosition, setNotePopupPosition] = useState({ top: 0, left: 0 });
+  const [deletePopupPosition, setDeletePopupPosition] = useState({ top: 0, left: 0 });
   const [selectedText, setSelectedText] = useState('');
-  const [noteText, setNoteText] = useState('');
-  const [isTextHighlighted, setIsTextHighlighted] = useState(false);
+  const [highlightedElement, setHighlightedElement] = useState(null);
+  const [notedElement, setNotedElement] = useState(null);
+  const textRef = useRef(null);
+  const noteTextRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (deletePopupVisible && !event.target.closest('.popup')) {
+        setDeletePopupVisible(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [deletePopupVisible]);
 
   const handleMouseUp = () => {
-    const selection = window.getSelection();
-    const text = selection.toString();
-    if (text) {
-      setSelectedText(text);
-      setIsTextHighlighted(isTextCurrentlyHighlighted(text));
+    const selectedText = window.getSelection().toString();
+    if (selectedText) {
+      const rect = window.getSelection().getRangeAt(0).getBoundingClientRect();
+      setPopupPosition({ top: rect.top + window.scrollY, left: rect.left + window.scrollX });
       setPopupVisible(true);
     } else {
       setPopupVisible(false);
     }
   };
 
-  const isTextCurrentlyHighlighted = (text) => {
-    const essayElement = document.getElementById('essay');
-    const highlightedElements = essayElement.getElementsByClassName('highlight');
-    for (let i = 0; i < highlightedElements.length; i++) {
-      if (highlightedElements[i].innerText === text) {
-        return true;
-      }
-    }
-    return false;
-  };
-
   const handleHighlight = () => {
-    highlightText(selectedText, 'yellow');
-    setPopupVisible(false);
+    const selectedText = window.getSelection().toString();
+    if (selectedText) {
+      const range = window.getSelection().getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.backgroundColor = 'yellow';
+      span.onclick = (e) => handleDeletePopup(e, span);
+      range.surroundContents(span);
+      setPopupVisible(false);
+    }
   };
 
-  const handleTakeNote = () => {
-    const newNotes = [...notes, { text: selectedText, note: noteText, highlighted: true }];
-    setNotes(newNotes);
-    highlightText(selectedText, 'yellow');
-    setPopupVisible(false);
-    setNoteText('');
+  const handleNote = () => {
+    const selectedText = window.getSelection().toString();
+    if (selectedText) {
+      const range = window.getSelection().getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.fontWeight = 'bold';
+      span.onclick = (e) => handleDeletePopup(e, span);
+      range.surroundContents(span);
+
+      const rect = range.getBoundingClientRect();
+      setNotePopupPosition({ top: rect.top + window.scrollY, left: rect.left + window.scrollX });
+      setNotePopupVisible(true);
+      setPopupVisible(false);
+      setSelectedText(selectedText);
+    }
   };
 
-  const highlightText = (text, color) => {
-    const essayElement = document.getElementById('essay');
-    const innerHTML = essayElement.innerHTML;
-    const highlightedText = innerHTML.replace(
-      new RegExp(`(${text})`, 'g'),
-      `<span class="highlight" style="background-color: ${color};">$1</span>`
-    );
-    essayElement.innerHTML = highlightedText;
+  const handleDeletePopup = (e, element) => {
+    e.stopPropagation();
+    const rect = element.getBoundingClientRect();
+    setDeletePopupPosition({ top: rect.top + window.scrollY, left: rect.left + window.scrollX });
+    setDeletePopupVisible(true);
+    setHighlightedElement(element);
   };
 
-  const toggleHighlight = (index) => {
-    const newNotes = [...notes];
-    const note = newNotes[index];
-    const currentColor = note.highlighted ? 'green' : 'yellow';
-    highlightText(note.text, currentColor);
-    note.highlighted = !note.highlighted;
-    setNotes(newNotes);
+  const deleteHighlightOrNote = () => {
+    if (highlightedElement) {
+      const parent = highlightedElement.parentNode;
+      const textContent = highlightedElement.textContent;
+      while (highlightedElement.firstChild) {
+        parent.insertBefore(highlightedElement.firstChild, highlightedElement);
+      }
+      parent.removeChild(highlightedElement);
+      setDeletePopupVisible(false);
+      setHighlightedElement(null);
+
+      // Remove the corresponding note
+      setNotes((prevNotes) => {
+        const noteLines = prevNotes.split('\n');
+        const updatedNotes = noteLines.filter(note => !note.startsWith(textContent)).join('\n');
+        return updatedNotes;
+      });
+    }
   };
 
-  const deleteFormatting = (text) => {
-    const essayElement = document.getElementById('essay');
-    const innerHTML = essayElement.innerHTML;
-    const unhighlightedText = innerHTML.replace(
-      new RegExp(`<span class="highlight" style="background-color: (yellow|green);">([^<]*)</span>`, 'g'),
-      '$2'
-    );
-    essayElement.innerHTML = unhighlightedText;
-    setNotes(notes.filter(note => note.text !== text));
-  };
+  const saveNote = () => {
+    const noteText = noteTextRef.current.value;
+    if (noteText) {
+      const newNote = `${selectedText}: ${noteText}\n`;
+      setNotes((prevNotes) => prevNotes + newNote);
 
-  const deleteHighlight = () => {
-    deleteFormatting(selectedText);
-    setPopupVisible(false);
+      setNotePopupVisible(false);
+      noteTextRef.current.value = '';
+    }
   };
 
   return (
-    <div className="App">
-      <div className="essay" id="essay" onMouseUp={handleMouseUp}>
-        {essayText.split('\n').map((line, index) => (
-          <p key={index}>{line}</p>
-        ))}
-      </div>
-      <div className="notes">
-        <h2>Notes</h2>
-        <ul>
-          {notes.map((item, index) => (
-            <li key={index} onClick={() => toggleHighlight(index)}>
-              {item.note} 
-              <button onClick={(e) => { e.stopPropagation(); deleteFormatting(item.text); }}>Delete</button>
-            </li>
-          ))}
-        </ul>
+    <div className="container mx-auto p-4" onMouseUp={handleMouseUp}>
+      <h1 className="text-2xl font-bold mb-4">IELTS Test Interface</h1>
+      <div className="flex">
+        <div className="w-1/4 pr-4">
+          <h2 className="text-xl font-semibold mb-2">Notes</h2>
+          <textarea
+            className="w-full p-2 border"
+            rows="20"
+            value={notes}
+            readOnly
+            placeholder="Your notes will appear here..."
+          ></textarea>
+        </div>
+        <div className="w-3/4">
+          <p ref={textRef} className="border p-4">
+            This is a sample text for the IELTS reading section. You can highlight any part of this text by selecting it with your mouse.
+          </p>
+        </div>
       </div>
       {popupVisible && (
-        <div className="popup">
-          {isTextHighlighted ? (
-            <button onClick={deleteHighlight}>Delete Highlight</button>
-          ) : (
-            <>
-              <button onClick={handleHighlight}>Highlight</button>
-              <textarea
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-                placeholder="Enter your note here..."
-              />
-              <button onClick={handleTakeNote}>Take Note</button>
-            </>
-          )}
+        <div
+          className="popup bg-white border p-2"
+          style={{ position: 'absolute', top: popupPosition.top, left: popupPosition.left }}
+        >
+          <button className="mr-2" onClick={handleHighlight}>Highlight</button>
+          <button onClick={handleNote}>Note</button>
+        </div>
+      )}
+      {notePopupVisible && (
+        <div
+          className="popup bg-white border p-2"
+          style={{ position: 'absolute', top: notePopupPosition.top, left: notePopupPosition.left }}
+        >
+          <textarea ref={noteTextRef} className="w-full p-2 border" rows="3" placeholder="Write your note here..."></textarea>
+          <button onClick={saveNote}>Save Note</button>
+        </div>
+      )}
+      {deletePopupVisible && (
+        <div
+          className="popup bg-white border p-2"
+          style={{ position: 'absolute', top: deletePopupPosition.top, left: deletePopupPosition.left }}
+        >
+          <button className="mr-2" onClick={deleteHighlightOrNote}>Remove</button>
         </div>
       )}
     </div>

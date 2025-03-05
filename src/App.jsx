@@ -11,7 +11,6 @@ const App = () => {
   const [deletePopupPosition, setDeletePopupPosition] = useState({ top: 0, left: 0 });
   const [selectedText, setSelectedText] = useState('');
   const [highlightedElement, setHighlightedElement] = useState(null);
-  const [notedElement, setNotedElement] = useState(null);
   const textRef = useRef(null);
   const noteTextRef = useRef(null);
 
@@ -30,7 +29,7 @@ const App = () => {
 
   const handleMouseUp = () => {
     const selectedText = window.getSelection().toString();
-    if (selectedText) {
+    if (selectedText && window.getSelection().anchorNode.parentElement.closest('.reading-text')) {
       const rect = window.getSelection().getRangeAt(0).getBoundingClientRect();
       setPopupPosition({ top: rect.top + window.scrollY, left: rect.left + window.scrollX });
       setPopupVisible(true);
@@ -122,7 +121,7 @@ const App = () => {
           ></textarea>
         </div>
         <div className="w-3/4">
-          <p ref={textRef} className="border p-4">
+          <p ref={textRef} className="border p-4 reading-text">
             This is a sample text for the IELTS reading section. You can highlight any part of this text by selecting it with your mouse.
           </p>
         </div>
